@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CodeStats{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Welcome back, {{ username }}! Here's your coding performance overview.{% endblock %}
+{% block content %}
+<div class="metrics-grid" id="metrics-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="metric"><div class="metric-label">📋 Total</div><div class="metric-val" id="m-total">—</div><div class="metric-sub">problems</div></div>
+  <div class="metric"><div class="metric-label">✅ Solved</div><div class="metric-val" id="m-solved" style="color:var(--green)">—</div><div class="metric-sub">completed</div></div>
+  <div class="metric"><div class="metric-label">⏱ Time</div><div class="metric-val" id="m-time">—</div><div class="metric-sub">minutes</div></div>
+  <div class="metric"><div class="metric-label">🔥 Streak</div><div class="metric-val" id="m-streak" style="color:var(--warn)">—</div><div class="metric-sub">days</div></div>
+  <div class="metric"><div class="metric-label">🗂 Topics</div><div class="metric-val" id="m-topics">—</div><div class="metric-sub">covered</div></div>
+</div>
+
+<div class="card" style="margin-bottom:20px">
+  <div style="font-size:14px;font-weight:700;margin-bottom:4px">Activity Heatmap</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Problems logged over the past year</div>
+  <div id="heatmap-wrap" style="overflow-x:auto"></div>
+  <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--muted)">
+    Less
+    <div style="width:11px;height:11px;border-radius:2px;background:var(--surface2)"></div>
+    <div style="width:11px;height:11px;border-radius:2px;background:rgba(99,102,241,.2)"></div>
+    <div style="width:11px;height:11px;border-radius:2px;background:rgba(99,102,241,.45)"></div>
+    <div style="width:11px;height:11px;border-radius:2px;background:rgba(99,102,241,.75)"></div>
+    <div style="width:11px;height:11px;border-radius:2px;background:#6366f1"></div>
+    More
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px">
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px">Difficulty Distribution</div>
+    <div style="display:flex;align-items:center;gap:24px;justify-content:center">
+      <canvas id="diff-donut" width="150" height="150"></canvas>
+      <div id="diff-legend"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">⚠ Focus Areas</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Heap-ranked weakness score</div>
+    <div id="weak-list"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700">Recent Problems</div>
+    <a href="/tracker" class="btn btn-primary btn-sm">+ Log New</a>
+  </div>
+  <div id="recent-table"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function load(){
+  const [an,probs]=await Promise.all([fetch('/api/analytics').then(r=>r.json()),fetch('/api/problems').then(r=>r.json())]);
+  if(an.empty){
+    ['m-total','m-solved','m-time','m-streak','m-topics'].forEach(id=>document.getElementById(id).textContent='0');
+    document.getElementById('recent-table').innerHTML='<div style="text-align:center;padding:28px;color:var(--muted)">No problems yet. <a href="/tracker" style="color:var(--accent)">Log your first one →</a></div>';
+    renderHeatmap([]);return;
+  }
+  document.getElementById('m-total').textContent=an.total;
+  document.getElementById('m-solved').textContent=an.solved;
+  document.getElementById('m-time').textContent=an.total_time;
+  document.getElementById('m-streak').textContent=an.streak;
+  document.getElementById('m-topics').textContent=an.topic_stats.length;
+  renderHeatmap(an.heatmap);
+  renderDiff(an.diff_map);
+  renderWeak(an.weak_topics);
+  renderRecent(probs.slice(0,6));
+}
+
+function renderHeatmap(data){
+  const wrap=document.getElementById('heatmap-wrap');
+  if(!data.length){wrap.innerHTML='<div style="color:var(--muted);font-size:13px">No activity.</div>';return;}
+  const weeks=[];let week=[];
+  data.forEach(d=>{week.push(d);if(week.length===7){weeks.push(week);week=[];}});
+  if(week.length)weeks.push(week);
+  const sz=12,g=3;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width',weeks.length*(sz+g));svg.setAttribute('height',7*(sz+g)+20);
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let lastM='';
+  weeks.forEach((week,wi)=>{
+    week.forEach((day,di)=>{
+      const c=day.count;
+      const fill=c===0?'#1a1d2e':c===1?'rgba(99,102,241,.2)':c===2?'rgba(99,102,241,.45)':c===3?'rgba(99,102,241,.75)':'#6366f1';
+      const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x',wi*(sz+g));rect.setAttribute('y',di*(sz+g)+18);
+      rect.setAttribute('width',sz);rect.setAttribute('height',sz);rect.setAttribute('rx',3);
+      rect.setAttribute('fill',fill);
+      const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent=`${day.date}: ${c} problem${c!==1?'s':''}`;
+      rect.appendChild(title);svg.appendChild(rect);
+      const m=day.date.slice(5,7);
+      if(di===0&&m!==lastM){
+        const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+        txt.setAttribute('x',wi*(sz+g));txt.setAttribute('y',12);
+        txt.setAttribute('fill','#7b8199');txt.setAttribute('font-size','10');
+        txt.textContent=months[parseInt(m)-1];svg.appendChild(txt);lastM=m;
+      }
+    });
+  });
+  wrap.innerHTML='';wrap.appendChild(svg);
+}
+
+function renderDiff(dm){
+  const canvas=document.getElementById('diff-donut');
+  const ctx=canvas.getContext('2d');
+  const data=[dm.Easy||0,dm.Medium||0,dm.Hard||0];
+  const cols=['#10b981','#f59e0b','#ef4444'];
+  const total=data.reduce((a,b)=>a+b,0)||1;
+  let start=-Math.PI/2;const cx=75,cy=75,r=60,inner=36;
+  ctx.clearRect(0,0,150,150);
+  data.forEach((v,i)=>{
+    const s=(v/total)*Math.PI*2;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,start+s);ctx.closePath();
+    ctx.fillStyle=cols[i];ctx.fill();start+=s;
+  });
+  ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.fillStyle='#12151f';ctx.fill();
+  ctx.fillStyle='#e8eaf6';ctx.font='bold 18px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(data.reduce((a,b)=>a+b,0),cx,cy);
+  document.getElementById('diff-legend').innerHTML=['Easy','Medium','Hard'].map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <div style="width:10px;height:10px;border-radius:2px;background:${cols[i]}"></div>
+      <div><div style="font-size:13px;font-weight:600">${l}</div><div style="font-size:11px;color:var(--muted)">${data[i]}</div></div>
+    </div>`).join('');
+}
+
+function renderWeak(topics){
+  const el=document.getElementById('weak-list');
+  if(!topics.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px">Log more problems to detect weak spots</div>';return;}
+  const max=Math.max(...topics.map(t=>t.weakness),.01);
+  el.innerHTML=topics.map((t,i)=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:600">${['🥇','🥈','🥉'][i]||'•'} ${t.topic}</span>
+        <span style="font-size:11px;color:var(--muted)">${t.solved}/${t.total} · ${t.avg_time}m avg</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${Math.round(t.weakness/max*100)}%;background:linear-gradient(90deg,#ef4444,#f59e0b)"></div></div>
+    </div>`).join('');
+}
+
+function renderRecent(probs){
+  const el=document.getElementById('recent-table');
+  if(!probs.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">No problems yet.</div>';return;}
+  const PLAT_ICONS={'LeetCode':'🟡','HackerRank':'🟢','Codeforces':'🔵','CodeChef':'🟤','Other':'⚪'};
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+      <th style="text-align:left;padding:7px 0;font-weight:500">Problem</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left">Topic</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left">Diff</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left">Platform</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left">Lang</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left">Status</th>
+    </tr></thead>
+    <tbody>${probs.map(p=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:9px 0">${p.question_link?`<a href="${p.question_link}" target="_blank" style="color:var(--accent);font-weight:600">${p.question_name} ↗</a>`:`<span style="font-weight:600">${p.question_name}</span>`}</td>
+      <td style="padding:9px 8px;color:var(--muted)">${p.topic}</td>
+      <td style="padding:9px 8px"><span class="badge b-${p.difficulty.toLowerCase()}">${p.difficulty}</span></td>
+      <td style="padding:9px 8px;font-size:12px">${PLAT_ICONS[p.platform]||'⚪'} ${p.platform||'—'}</td>
+      <td style="padding:9px 8px;color:var(--muted);font-size:12px">${p.language||'—'}</td>
+      <td style="padding:9px 8px"><span class="badge ${p.solved?'b-solved':'b-unsolved'}">${p.solved?'Solved':'Unsolved'}</span></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+load();
+</script>
+{% endblock %}

@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% block title %}Log Problem — CodeStats{% endblock %}
+{% block page_title %}Log Problem{% endblock %}
+{% block page_sub %}Track every coding session — paste a link to auto-fill details{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:420px 1fr;gap:20px;align-items:start">
+
+<!-- ── Add form ── -->
+<div style="position:sticky;top:76px">
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:3px">📝 Log a Problem</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:16px">Paste a link to auto-extract details ↓</div>
+
+    <div class="form-group">
+      <label>Problem URL (auto-fill)</label>
+      <div style="display:flex;gap:7px">
+        <input type="url" id="f-link" placeholder="https://leetcode.com/problems/..." style="flex:1" oninput="onLinkChange()"/>
+        <button class="btn btn-ghost btn-sm" id="extract-btn" onclick="extractLink()" style="white-space:nowrap;padding:8px 12px">⚡ Fill</button>
+      </div>
+      <div id="extract-status" style="font-size:10px;margin-top:3px"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Problem Name *</label>
+        <input type="text" id="f-name" placeholder="e.g. Two Sum"/>
+      </div>
+      <div class="form-group">
+        <label>Topic *</label>
+        <input type="text" id="f-topic" placeholder="Arrays, DP..." list="topic-list"/>
+        <datalist id="topic-list">
+          <option>Arrays</option><option>Strings</option><option>Linked Lists</option><option>Trees</option>
+          <option>Graphs</option><option>Dynamic Programming</option><option>Recursion</option>
+          <option>Binary Search</option><option>Hash Maps</option><option>Heaps</option>
+          <option>Stacks</option><option>Queues</option><option>Tries</option><option>Greedy</option>
+          <option>Backtracking</option><option>Math</option><option>Two Pointers</option>
+          <option>Sliding Window</option><option>Bit Manipulation</option><option>Union Find</option>
+        </datalist>
+      </div>
+      <div class="form-group">
+        <label>Difficulty</label>
+        <select id="f-diff">
+          <option value="Easy">🟢 Easy</option>
+          <option value="Medium" selected>🟡 Medium</option>
+          <option value="Hard">🔴 Hard</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Platform</label>
+        <select id="f-platform">
+          <option>LeetCode</option><option>HackerRank</option><option>Codeforces</option>
+          <option>CodeChef</option><option>GeeksForGeeks</option><option>InterviewBit</option>
+          <option>AtCoder</option><option>SPOJ</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Language</label>
+        <select id="f-lang">
+          <option>Python</option><option>Java</option><option>C++</option><option>C</option>
+          <option>JavaScript</option><option>TypeScript</option><option>Go</option>
+          <option>Rust</option><option>Kotlin</option><option>Swift</option><option>C#</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Time Taken (mins) *</label>
+        <input type="number" id="f-time" min="1" placeholder="25"/>
+      </div>
+      <div class="form-group">
+        <label>Times Attempted</label>
+        <input type="number" id="f-times" min="1" value="1"/>
+      </div>
+    </div>
+
+    <!-- Tags -->
+    <div class="form-group">
+      <label>Tags (comma-separated)</label>
+      <input type="text" id="f-tags" placeholder="interview-prep, revisit, pattern-match"/>
+    </div>
+
+    <div class="form-group">
+      <label>Notes / Approach</label>
+      <textarea id="f-notes" rows="2" placeholder="Key insight, why you got stuck..."></textarea>
+    </div>
+
+    <!-- Solution code -->
+    <div class="form-group">
+      <label>Solution Code (optional)</label>
+      <textarea id="f-code" rows="3" class="code-area" placeholder="# Paste your solution here..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Status</label>
+      <div style="display:flex;gap:7px">
+        <button id="btn-solved" onclick="setSolved(true)" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:#10b981;font-weight:600;cursor:pointer;font-size:12px;font-family:inherit">✅ Solved</button>
+        <button id="btn-unsolved" onclick="setSolved(false)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:600;cursor:pointer;font-size:12px;font-family:inherit">⏳ Unsolved</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;padding:10px;font-size:13px" onclick="submitProblem()">Save Problem →</button>
+  </div>
+
+  <!-- Import card -->
+  <div class="card">
+    <div style="font-size:13px;font-weight:700;margin-bottom:3px">📥 Import Problems</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Upload a CSV or JSON export file</div>
+    <input type="file" id="import-file" accept=".csv,.json" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:10px"/>
+    <button class="btn btn-ghost" style="width:100%;font-size:12px" onclick="doImport()">⬆ Import File</button>
+    <div id="import-status" style="font-size:11px;margin-top:7px;color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- ── Problem list ── -->
+<div>
+  <div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="text" id="s-q" placeholder="🔍 Search problems..." style="flex:1;min-width:130px;padding:7px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px" oninput="filterP()"/>
+    <select id="s-topic" style="padding:7px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px" onchange="filterP()"><option value="">All Topics</option></select>
+    <select id="s-plat" style="padding:7px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px" onchange="filterP()"><option value="">All Platforms</option></select>
+    <select id="s-diff" style="padding:7px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px" onchange="filterP()"><option value="">All Difficulty</option><option>Easy</option><option>Medium</option><option>Hard</option></select>
+    <select id="s-status" style="padding:7px 11px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px" onchange="filterP()"><option value="">All Status</option><option value="solved">Solved</option><option value="unsolved">Unsolved</option></select>
+  </div>
+  <div id="p-count" style="font-size:11px;color:var(--muted);margin-bottom:9px"></div>
+  <div id="p-list"></div>
+</div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="edit-modal" onclick="if(event.target===this)closeEdit()">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-title">✏ Edit Problem</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <div class="form-group" style="grid-column:1/-1"><label>Name</label><input id="e-name"/></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Link</label><input type="url" id="e-link"/></div>
+      <div class="form-group"><label>Topic</label><input id="e-topic"/></div>
+      <div class="form-group"><label>Difficulty</label><select id="e-diff"><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+      <div class="form-group"><label>Platform</label>
+        <select id="e-platform"><option>LeetCode</option><option>HackerRank</option><option>Codeforces</option><option>CodeChef</option><option>GeeksForGeeks</option><option>InterviewBit</option><option>AtCoder</option><option>SPOJ</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Language</label>
+        <select id="e-lang"><option>Python</option><option>Java</option><option>C++</option><option>C</option><option>JavaScript</option><option>TypeScript</option><option>Go</option><option>Rust</option><option>Kotlin</option><option>Swift</option><option>C#</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label>Time (mins)</label><input type="number" id="e-time"/></div>
+      <div class="form-group"><label>Times Done</label><input type="number" id="e-times"/></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Tags</label><input id="e-tags" placeholder="comma-separated"/></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Notes</label><textarea id="e-notes" rows="2"></textarea></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Solution Code</label><textarea id="e-code" rows="4" class="code-area"></textarea></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:6px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Code viewer modal -->
+<div class="modal-overlay" id="code-modal" onclick="if(event.target===this)closeCode()">
+  <div class="modal-box" style="max-width:660px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="modal-title" id="code-modal-title" style="margin:0">Solution Code</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeCode()">✕</button>
+    </div>
+    <pre id="code-content" style="background:var(--bg);padding:16px;border-radius:10px;font-size:12px;font-family:'Consolas','Fira Code',monospace;overflow-x:auto;white-space:pre-wrap;color:var(--text);line-height:1.6;max-height:60vh;overflow-y:auto;border:1px solid var(--border)"></pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let problems = [], isSolved = true, editId = null;
+
+function setSolved(s) {
+  isSolved = s;
+  const base = 'flex:1;padding:8px;border-radius:8px;font-weight:600;cursor:pointer;font-size:12px;font-family:inherit;';
+  document.getElementById('btn-solved').style.cssText = base + (s
+    ? 'border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.1);color:#10b981'
+    : 'border:1px solid var(--border);background:transparent;color:var(--muted)');
+  document.getElementById('btn-unsolved').style.cssText = base + (!s
+    ? 'border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);color:#8b5cf6'
+    : 'border:1px solid var(--border);background:transparent;color:var(--muted)');
+}
+
+let extractTimer = null;
+function onLinkChange() {
+  clearTimeout(extractTimer);
+  const url = document.getElementById('f-link').value.trim();
+  if (url.length > 15) extractTimer = setTimeout(extractLink, 900);
+}
+
+async function extractLink() {
+  const url = document.getElementById('f-link').value.trim();
+  if (!url) return;
+  const stat = document.getElementById('extract-status');
+  stat.style.color = 'var(--muted)'; stat.textContent = '⚡ Extracting...';
+  document.getElementById('extract-btn').disabled = true;
+  try {
+    const r = await fetch('/api/extract-problem?url=' + encodeURIComponent(url));
+    const d = await r.json();
+    if (d.error) { stat.style.color = 'var(--danger)'; stat.textContent = 'Could not extract.'; return; }
+    if (d.question_name) document.getElementById('f-name').value = d.question_name;
+    if (d.platform) document.getElementById('f-platform').value = d.platform;
+    if (d.difficulty) document.getElementById('f-diff').value = d.difficulty;
+    if (d.topic) document.getElementById('f-topic').value = d.topic;
+    stat.style.color = '#10b981'; stat.textContent = '✓ Auto-filled!';
+    setTimeout(() => stat.textContent = '', 2500);
+  } catch { stat.style.color = 'var(--danger)'; stat.textContent = 'Failed.'; }
+  document.getElementById('extract-btn').disabled = false;
+}
+
+async function submitProblem() {
+  const name = document.getElementById('f-name').value.trim();
+  const topic = document.getElementById('f-topic').value.trim();
+  const time = parseFloat(document.getElementById('f-time').value);
+  if (!name || !topic || isNaN(time) || time < 1) return toast('Fill in name, topic and time (*).', 'err');
+
+  const payload = {
+    question_name: name, topic, difficulty: document.getElementById('f-diff').value,
+    platform: document.getElementById('f-platform').value, language: document.getElementById('f-lang').value,
+    time_minutes: time, times_done: parseInt(document.getElementById('f-times').value) || 1,
+    question_link: document.getElementById('f-link').value.trim(),
+    solved: isSolved, notes: document.getElementById('f-notes').value.trim(),
+    solution_code: document.getElementById('f-code').value.trim(),
+    tags: document.getElementById('f-tags').value.trim(),
+  };
+
+  const r = await fetch('/api/problems', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const d = await r.json();
+  if (d.success) {
+    toast('"' + name + '" saved!');
+    ['f-name','f-link','f-topic','f-time','f-notes','f-code','f-tags'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-times').value = '1';
+    document.getElementById('f-diff').value = 'Medium';
+    setSolved(true);
+    document.getElementById('extract-status').textContent = '';
+    await loadProblems();
+  } else toast(d.error || 'Save failed.', 'err');
+}
+
+async function loadProblems() {
+  problems = await fetch('/api/problems').then(r => r.json());
+  const topics = [...new Set(problems.map(p => p.topic))].sort();
+  const plats = [...new Set(problems.map(p => p.platform || 'Other'))].sort();
+  const ts = document.getElementById('s-topic'), cv = ts.value;
+  ts.innerHTML = '<option value="">All Topics</option>' + topics.map(t => `<option${t===cv?' selected':''}>${t}</option>`).join('');
+  const ps = document.getElementById('s-plat'), cp = ps.value;
+  ps.innerHTML = '<option value="">All Platforms</option>' + plats.map(p => `<option${p===cp?' selected':''}>${p}</option>`).join('');
+  filterP();
+}
+
+function filterP() {
+  const q = document.getElementById('s-q').value.toLowerCase();
+  const topic = document.getElementById('s-topic').value;
+  const plat = document.getElementById('s-plat').value;
+  const diff = document.getElementById('s-diff').value;
+  const st = document.getElementById('s-status').value;
+  const f = problems.filter(p => {
+    if (q && !p.question_name.toLowerCase().includes(q) && !p.topic.toLowerCase().includes(q) && !(p.tags||'').toLowerCase().includes(q)) return false;
+    if (topic && p.topic !== topic) return false;
+    if (plat && (p.platform || 'Other') !== plat) return false;
+    if (diff && p.difficulty !== diff) return false;
+    if (st === 'solved' && !p.solved) return false;
+    if (st === 'unsolved' && p.solved) return false;
+    return true;
+  });
+  document.getElementById('p-count').textContent = `Showing ${f.length} of ${problems.length} problems`;
+  const ICONS = {'LeetCode':'🟡','HackerRank':'🟢','Codeforces':'🔵','CodeChef':'🟤','GeeksForGeeks':'🌿','Other':'⚪'};
+  const el = document.getElementById('p-list');
+  if (!f.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:34px;color:var(--muted)">${problems.length ? 'No problems match filters.' : 'No problems yet! Log your first one ↑'}</div>`;
+    return;
+  }
+  el.innerHTML = f.map(p => `
+    <div class="card-sm" style="margin-bottom:9px;transition:border .2s" onmouseenter="this.style.borderColor='rgba(99,102,241,.35)'" onmouseleave="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:flex-start;gap:10px;justify-content:space-between">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            ${p.question_link
+              ? `<a href="${p.question_link}" target="_blank" style="font-size:13px;font-weight:700;color:var(--accent)">${p.question_name} ↗</a>`
+              : `<span style="font-size:13px;font-weight:700">${p.question_name}</span>`}
+            <span class="badge b-${p.difficulty.toLowerCase()}">${p.difficulty}</span>
+            <span class="badge ${p.solved?'b-solved':'b-unsolved'}">${p.solved?'✓ Solved':'⏳ Unsolved'}</span>
+            ${p.review_date ? `<span class="badge" style="background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2)">📅 Review ${p.review_date}</span>` : ''}
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--muted)">
+            <span>📂 ${p.topic}</span>
+            <span>${ICONS[p.platform]||'⚪'} ${p.platform||'Other'}</span>
+            <span>💻 ${p.language||'—'}</span>
+            <span>⏱ ${p.time_minutes}m</span>
+            <span>🔁 ${p.times_done}x</span>
+            <span>📅 ${p.created_at}</span>
+          </div>
+          ${p.tags ? `<div style="margin-top:5px;display:flex;gap:4px;flex-wrap:wrap">${p.tags.split(',').filter(Boolean).map(t=>`<span style="font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(99,102,241,.1);color:var(--accent);border:1px solid rgba(99,102,241,.2)">${t.trim()}</span>`).join('')}</div>` : ''}
+          ${p.notes ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;padding:4px 8px;background:var(--surface2);border-radius:5px;border-left:2px solid var(--border)">📝 ${p.notes}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
+          ${p.solution_code ? `<button class="btn btn-ghost btn-sm" onclick="viewCode(${p.id},'${p.question_name.replace(/'/g,"\\'")}')">Code</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="openEdit(${p.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="delP(${p.id},'${p.question_name.replace(/'/g,"\\'")}')">Del</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function delP(id, name) {
+  if (!confirm(`Remove "${name}"?`)) return;
+  await fetch(`/api/problems/${id}`, { method: 'DELETE' });
+  toast('"' + name + '" removed');
+  await loadProblems();
+}
+
+function openEdit(id) {
+  const p = problems.find(x => x.id === id); if (!p) return;
+  editId = id;
+  document.getElementById('e-name').value = p.question_name;
+  document.getElementById('e-link').value = p.question_link || '';
+  document.getElementById('e-topic').value = p.topic;
+  document.getElementById('e-diff').value = p.difficulty;
+  document.getElementById('e-platform').value = p.platform || 'LeetCode';
+  document.getElementById('e-lang').value = p.language || 'Python';
+  document.getElementById('e-time').value = p.time_minutes;
+  document.getElementById('e-times').value = p.times_done;
+  document.getElementById('e-tags').value = p.tags || '';
+  document.getElementById('e-notes').value = p.notes || '';
+  document.getElementById('e-code').value = p.solution_code || '';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+function closeEdit() { document.getElementById('edit-modal').style.display = 'none'; editId = null; }
+
+async function saveEdit() {
+  if (!editId) return;
+  const payload = {
+    question_name: document.getElementById('e-name').value.trim(),
+    question_link: document.getElementById('e-link').value.trim(),
+    topic: document.getElementById('e-topic').value.trim(),
+    difficulty: document.getElementById('e-diff').value,
+    platform: document.getElementById('e-platform').value,
+    language: document.getElementById('e-lang').value,
+    time_minutes: parseFloat(document.getElementById('e-time').value),
+    times_done: parseInt(document.getElementById('e-times').value),
+    tags: document.getElementById('e-tags').value.trim(),
+    notes: document.getElementById('e-notes').value.trim(),
+    solution_code: document.getElementById('e-code').value.trim(),
+  };
+  await fetch(`/api/problems/${editId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  toast('Updated!'); closeEdit(); await loadProblems();
+}
+
+function viewCode(id, name) {
+  const p = problems.find(x => x.id === id);
+  if (!p || !p.solution_code) return;
+  document.getElementById('code-modal-title').textContent = name + ' — Solution';
+  document.getElementById('code-content').textContent = p.solution_code;
+  document.getElementById('code-modal').style.display = 'flex';
+}
+function closeCode() { document.getElementById('code-modal').style.display = 'none'; }
+
+async function doImport() {
+  const file = document.getElementById('import-file').files[0];
+  if (!file) return toast('Select a file first.', 'err');
+  const fd = new FormData(); fd.append('file', file);
+  const stat = document.getElementById('import-status');
+  stat.textContent = 'Importing...'; stat.style.color = 'var(--muted)';
+  try {
+    const r = await fetch('/api/import', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.success) {
+      stat.style.color = '#10b981';
+      stat.textContent = `✓ Imported ${d.imported} problems!`;
+      toast(`Imported ${d.imported} problems!`);
+      await loadProblems();
+    } else {
+      stat.style.color = 'var(--danger)';
+      stat.textContent = d.error || 'Import failed.';
+    }
+  } catch { stat.style.color = 'var(--danger)'; stat.textContent = 'Import error.'; }
+}
+
+loadProblems();
+</script>
+{% endblock %}

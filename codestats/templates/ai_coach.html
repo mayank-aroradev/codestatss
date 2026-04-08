@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}AI Coach — CodeStats{% endblock %}
+{% block page_title %}AI Coach{% endblock %}
+{% block page_sub %}Personalized DSA coaching powered by Claude AI{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:280px 1fr;gap:22px;align-items:start">
+
+<!-- Sidebar controls -->
+<div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px">✦ Analysis Type</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="ai-type-btn active-type" data-type="full" onclick="setType('full',this)" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(99,102,241,.3);background:rgba(99,102,241,.1);color:var(--accent);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;text-align:left">
+        🎯 Full Analysis<br><span style="font-size:11px;font-weight:400;color:var(--muted)">Complete skill assessment + roadmap</span>
+      </button>
+      <button class="ai-type-btn" data-type="roadmap" onclick="setType('roadmap',this)" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;text-align:left">
+        🗺️ 30-Day Roadmap<br><span style="font-size:11px;font-weight:400">Week-by-week improvement plan</span>
+      </button>
+      <button class="ai-type-btn" data-type="gaps" onclick="setType('gaps',this)" style="width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;text-align:left">
+        ⚡ Skill Gap Analysis<br><span style="font-size:11px;font-weight:400">What's holding you back</span>
+      </button>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:14px;padding:11px;font-size:14px" onclick="runAnalysis()" id="run-btn">
+      ✦ Analyze My Profile →
+    </button>
+  </div>
+
+  <div class="card" id="quick-stats" style="margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--muted)">Quick Stats</div>
+    <div id="qs-content"><div style="color:var(--muted);font-size:13px">Loading...</div></div>
+  </div>
+
+  <div class="card" style="background:rgba(99,102,241,.05);border-color:rgba(99,102,241,.2)">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">How it works</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6">The AI analyzes your logged problems — topics, difficulty, solve rate, time patterns — and generates personalized recommendations using Claude AI.</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Set <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:10px">ANTHROPIC_API_KEY</code> env var for live AI responses.</div>
+  </div>
+</div>
+
+<!-- Main output -->
+<div>
+  <div id="ai-loading" style="display:none" class="card" style="text-align:center;padding:48px">
+    <div style="font-size:32px;margin-bottom:12px;animation:spin2 2s linear infinite;display:inline-block">✦</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Analyzing your profile...</div>
+    <div style="font-size:13px;color:var(--muted)">This may take a few seconds</div>
+  </div>
+
+  <div id="ai-output" style="display:none"></div>
+
+  <div id="ai-placeholder" class="card" style="text-align:center;padding:60px 40px">
+    <div style="font-size:48px;margin-bottom:16px">✦</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Your Personal DSA Coach</div>
+    <div style="font-size:14px;color:var(--muted);max-width:380px;margin:0 auto 24px;line-height:1.7">Select an analysis type and click Analyze to get personalized insights, roadmaps, and recommendations based on your actual progress data.</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:500px;margin:0 auto">
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:6px">📊</div>
+        <div style="font-size:12px;font-weight:600">Weakness Mapping</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Pattern insights</div>
+      </div>
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:6px">🔮</div>
+        <div style="font-size:12px;font-weight:600">Skill Gap Prediction</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Interview readiness</div>
+      </div>
+      <div style="padding:14px;border:1px solid var(--border);border-radius:10px">
+        <div style="font-size:20px;margin-bottom:6px">🗺️</div>
+        <div style="font-size:12px;font-weight:600">Custom Roadmap</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Week-by-week plan</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<style>
+@keyframes spin2{to{transform:rotate(360deg)}}
+#ai-output .md-section{margin-bottom:22px}
+#ai-output h2{font-size:16px;font-weight:700;margin-bottom:10px;padding:10px 14px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent)}
+#ai-output h3{font-size:14px;font-weight:600;margin:12px 0 6px;color:var(--accent)}
+#ai-output p{font-size:13px;line-height:1.75;color:var(--muted);margin-bottom:8px}
+#ai-output strong{color:var(--text);font-weight:600}
+#ai-output ul,#ai-output ol{margin:8px 0 8px 18px}
+#ai-output li{font-size:13px;line-height:1.7;color:var(--muted);margin-bottom:3px}
+#ai-output code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--accent2)}
+#ai-output blockquote{border-left:3px solid var(--accent2);padding:8px 14px;background:rgba(6,182,212,.05);border-radius:0 8px 8px 0;margin:10px 0}
+#ai-output blockquote p{color:var(--accent2)}
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+let selectedType='full';
+
+function setType(type,btn){
+  selectedType=type;
+  document.querySelectorAll('.ai-type-btn').forEach(b=>{
+    b.style.cssText='width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;text-align:left';
+  });
+  btn.style.cssText='width:100%;padding:11px 14px;border-radius:10px;border:1px solid rgba(99,102,241,.3);background:rgba(99,102,241,.1);color:var(--accent);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;text-align:left';
+}
+
+function parseMarkdown(md){
+  return md
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/^> (.+)$/gm,'<blockquote><p>$1</p></blockquote>')
+    .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
+    .replace(/^[-*] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g,s=>`<ul>${s}</ul>`)
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/^(?!<[hublc])(.*\S.*)$/gm,'<p>$1</p>')
+    .replace(/<p><\/p>/g,'');
+}
+
+async function runAnalysis(){
+  document.getElementById('ai-placeholder').style.display='none';
+  document.getElementById('ai-output').style.display='none';
+  document.getElementById('ai-loading').style.display='block';
+  document.getElementById('run-btn').disabled=true;
+  try{
+    const r=await fetch('/api/ai-coach',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selectedType})});
+    const d=await r.json();
+    document.getElementById('ai-loading').style.display='none';
+    const out=document.getElementById('ai-output');
+    out.style.display='block';
+    if(d.error){out.innerHTML=`<div class="card" style="border-color:rgba(239,68,68,.3);padding:20px"><p style="color:var(--danger)">${d.error}</p></div>`;return;}
+    out.innerHTML=`<div class="card">${parseMarkdown(d.result)}</div>`;
+  }catch(e){
+    document.getElementById('ai-loading').style.display='none';
+    document.getElementById('ai-output').style.display='block';
+    document.getElementById('ai-output').innerHTML='<div class="card" style="border-color:rgba(239,68,68,.3);padding:20px"><p style="color:var(--danger)">Error connecting to AI service.</p></div>';
+  }
+  document.getElementById('run-btn').disabled=false;
+}
+
+async function loadQuickStats(){
+  try{
+    const d=await fetch('/api/analytics').then(r=>r.json());
+    const el=document.getElementById('qs-content');
+    if(d.empty){el.innerHTML='<div style="color:var(--muted);font-size:12px">No data yet.</div>';return;}
+    const sr=Math.round(d.solved/d.total*100);
+    el.innerHTML=`
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted)">Total problems</span>
+        <span style="font-size:12px;font-weight:600">${d.total}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted)">Solve rate</span>
+        <span style="font-size:12px;font-weight:600;color:var(--green)">${sr}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted)">Topics</span>
+        <span style="font-size:12px;font-weight:600">${d.topic_stats.length}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--muted)">Streak</span>
+        <span style="font-size:12px;font-weight:600;color:var(--warn)">🔥 ${d.streak}d</span>
+      </div>
+      ${d.weak_topics.length?`<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+        <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Top Weaknesses</div>
+        ${d.weak_topics.map(t=>`<div style="font-size:12px;color:var(--danger);margin-bottom:3px">⚠ ${t.topic}</div>`).join('')}
+      </div>`:''}`;
+  }catch{}
+}
+loadQuickStats();
+</script>
+{% endblock %}

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#0a0c14"/>
+<title>{% block title %}CodeStats{% endblock %}</title>
+<link rel="manifest" href="/static/manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c14;--surface:#12151f;--surface2:#1a1d2e;--surface3:#20243a;
+  --border:#232640;--text:#e8eaf6;--muted:#7b8199;
+  --accent:#6366f1;--accent2:#06b6d4;--green:#10b981;--danger:#ef4444;--warn:#f59e0b;
+  --sidebar:252px;--radius:14px
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;min-height:100vh}
+a{color:inherit;text-decoration:none}
+/* ── Sidebar ── */
+.sidebar{width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow:hidden}
+.sidebar-brand{padding:20px 18px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border)}
+.brand-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0;letter-spacing:-1px}
+.brand-text{font-size:16px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.sidebar-user{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;cursor:pointer;transition:background .2s}
+.sidebar-user:hover{background:var(--surface2)}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0}
+.user-info .name{font-size:12px;font-weight:600}
+.user-info .role{font-size:10px;color:var(--muted)}
+/* Daily goal bar */
+.daily-goal{padding:10px 14px;border-bottom:1px solid var(--border)}
+.dg-top{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.dg-bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.dg-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .6s ease}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.nav-label{font-size:9px;color:var(--muted);font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:0 10px;margin:12px 0 5px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;color:var(--muted);font-size:13px;font-weight:500;transition:all .15s;margin-bottom:1px;position:relative}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:rgba(99,102,241,.13);color:var(--accent)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+.nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px}
+.nav-badge-warn{background:var(--danger)}
+.sidebar-footer{padding:10px 8px;border-top:1px solid var(--border)}
+.logout-btn{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;color:var(--danger);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.logout-btn:hover{background:rgba(239,68,68,.08)}
+/* ── Main ── */
+.main{margin-left:var(--sidebar);flex:1;min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 26px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.page-title{font-size:18px;font-weight:700}
+.page-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.streak-pill{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.12);color:var(--warn);border:1px solid rgba(245,158,11,.2);display:none}
+.content{padding:24px}
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px}
+.card-sm{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 16px}
+/* ── Metrics ── */
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:13px;margin-bottom:20px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:15px 17px;transition:border .2s}
+.metric:hover{border-color:var(--accent)}
+.metric-label{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.3px;text-transform:uppercase;margin-bottom:7px}
+.metric-val{font-size:24px;font-weight:800;line-height:1}
+.metric-sub{font-size:10px;color:var(--muted);margin-top:3px}
+/* ── Buttons ── */
+.btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 14px rgba(99,102,241,.3)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--surface2);border-color:var(--accent)}
+.btn-danger{background:rgba(239,68,68,.08);color:var(--danger);border:1px solid rgba(239,68,68,.15)}
+.btn-danger:hover{background:rgba(239,68,68,.15)}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:6px}
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600}
+.b-easy{background:rgba(16,185,129,.1);color:#10b981;border:1px solid rgba(16,185,129,.2)}
+.b-medium{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2)}
+.b-hard{background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2)}
+.b-solved{background:rgba(16,185,129,.08);color:#10b981}
+.b-unsolved{background:rgba(139,92,246,.08);color:#8b5cf6}
+/* ── Forms ── */
+.form-group{margin-bottom:13px}
+.form-group label{display:block;font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:all .2s;font-family:inherit}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.08)}
+.form-group input::placeholder,.form-group textarea::placeholder{color:#404566}
+.form-group select option{background:var(--surface2)}
+.form-group textarea{resize:vertical}
+/* ── Code input ── */
+.code-area{font-family:'Consolas','Fira Code',monospace;font-size:12px;line-height:1.5;background:var(--bg);border-color:var(--border)}
+/* ── Progress bar ── */
+.prog-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width .5s ease}
+/* ── Toast ── */
+#toast{position:fixed;bottom:22px;right:22px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toast-item{padding:10px 14px;border-radius:9px;font-size:12px;font-weight:500;max-width:280px;display:flex;align-items:center;gap:7px;animation:tin .25s ease}
+.toast-ok{background:#0d2e22;color:#10b981;border:1px solid rgba(16,185,129,.25)}
+.toast-err{background:#2a0d0d;color:#ef4444;border:1px solid rgba(239,68,68,.25)}
+.toast-info{background:#0d1a2e;color:#06b6d4;border:1px solid rgba(6,182,212,.25)}
+@keyframes tin{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+/* ── Modal overlay ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:16px}
+/* ── Profile modal ── */
+#profile-modal .modal-box{max-width:420px}
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">CS</div>
+    <div>
+      <div class="brand-text">CodeStats</div>
+      <div class="brand-sub">DSA Performance Hub</div>
+    </div>
+  </div>
+
+  <div class="sidebar-user" onclick="openProfile()">
+    <div class="avatar">{{ username[0]|upper }}</div>
+    <div class="user-info">
+      <div class="name">{{ username }}</div>
+      <div class="role">Tap to edit profile</div>
+    </div>
+  </div>
+
+  <!-- Daily goal -->
+  <div class="daily-goal">
+    <div class="dg-top">
+      <span>Today's Goal</span>
+      <span id="dg-label">—</span>
+    </div>
+    <div class="dg-bar"><div class="dg-fill" id="dg-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-label">Overview</div>
+    <a href="/dashboard" class="nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+      <span class="nav-icon">⊞</span> Dashboard
+    </a>
+    <div class="nav-label">Practice</div>
+    <a href="/tracker" class="nav-item {% if request.endpoint=='tracker' %}active{% endif %}">
+      <span class="nav-icon">✚</span> Log Problem
+    </a>
+    <a href="/review" class="nav-item {% if request.endpoint=='review' %}active{% endif %}">
+      <span class="nav-icon">♻</span> Review
+      <span class="nav-badge nav-badge-warn" id="review-badge" style="display:none">!</span>
+    </a>
+    <div class="nav-label">Analysis</div>
+    <a href="/analytics" class="nav-item {% if request.endpoint=='analytics' %}active{% endif %}">
+      <span class="nav-icon">◈</span> Analytics
+    </a>
+    <a href="/platforms" class="nav-item {% if request.endpoint=='platforms' %}active{% endif %}">
+      <span class="nav-icon">◉</span> Platforms
+    </a>
+    <a href="/ai-coach" class="nav-item {% if request.endpoint=='ai_coach' %}active{% endif %}">
+      <span class="nav-icon">✦</span> AI Coach <span class="nav-badge">AI</span>
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <a href="/logout" class="logout-btn"><span>⏏</span> Sign Out</a>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title">{% block page_title %}{% endblock %}</div>
+      <div class="page-sub">{% block page_sub %}{% endblock %}</div>
+    </div>
+    <div class="topbar-right">
+      <span class="streak-pill" id="streak-pill">🔥 <span id="streak-val">0</span> day streak</span>
+    </div>
+  </div>
+  <div class="content">{% block content %}{% endblock %}</div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Profile modal -->
+<div class="modal-overlay" id="profile-modal" onclick="if(event.target===this)closeProfile()">
+  <div class="modal-box">
+    <div class="modal-title">👤 Profile Settings</div>
+    <div class="form-group">
+      <label>Username</label>
+      <input id="pm-username" disabled style="opacity:.6"/>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input id="pm-email" disabled style="opacity:.6"/>
+    </div>
+    <div class="form-group">
+      <label>LeetCode Handle</label>
+      <input id="pm-lc" placeholder="your-lc-username"/>
+    </div>
+    <div class="form-group">
+      <label>Daily Problem Goal</label>
+      <input id="pm-goal" type="number" min="1" max="50" placeholder="3"/>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+      <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Export Data</div>
+      <div style="display:flex;gap:8px">
+        <a href="/api/export/csv" class="btn btn-ghost btn-sm">⬇ CSV</a>
+        <a href="/api/export/json" class="btn btn-ghost btn-sm">⬇ JSON</a>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveProfile()">Save</button>
+      <button class="btn btn-ghost" onclick="closeProfile()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toast(msg, type='ok') {
+  const t = document.createElement('div');
+  t.className = `toast-item toast-${type}`;
+  t.innerHTML = (type==='ok'?'✓ ':type==='info'?'ℹ ':' ✕ ') + msg;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+async function loadSidebarData() {
+  try {
+    const [dp, an] = await Promise.all([
+      fetch('/api/daily-progress').then(r => r.json()),
+      fetch('/api/analytics').then(r => r.json()),
+    ]);
+    // Daily goal
+    document.getElementById('dg-label').textContent = `${dp.done}/${dp.goal}`;
+    document.getElementById('dg-fill').style.width = dp.pct + '%';
+    // Streak
+    if (!an.empty && an.streak > 0) {
+      document.getElementById('streak-val').textContent = an.streak;
+      document.getElementById('streak-pill').style.display = 'inline-block';
+    }
+    // Review badge
+    if (!an.empty && an.due_review > 0) {
+      const b = document.getElementById('review-badge');
+      b.textContent = an.due_review;
+      b.style.display = 'inline-block';
+    }
+  } catch {}
+}
+
+// Profile modal
+async function openProfile() {
+  const d = await fetch('/api/profile').then(r => r.json());
+  document.getElementById('pm-username').value = d.username;
+  document.getElementById('pm-email').value = d.email;
+  document.getElementById('pm-lc').value = d.leetcode_handle || '';
+  document.getElementById('pm-goal').value = d.daily_goal || 3;
+  document.getElementById('profile-modal').style.display = 'flex';
+}
+function closeProfile() {
+  document.getElementById('profile-modal').style.display = 'none';
+}
+async function saveProfile() {
+  const payload = {
+    leetcode_handle: document.getElementById('pm-lc').value.trim(),
+    daily_goal: parseInt(document.getElementById('pm-goal').value) || 3,
+  };
+  await fetch('/api/profile', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  toast('Profile saved!');
+  closeProfile();
+  loadSidebarData();
+}
+
+loadSidebarData();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

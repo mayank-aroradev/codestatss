@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Platforms — CodeStats{% endblock %}
+{% block page_title %}Platform Stats{% endblock %}
+{% block page_sub %}Breakdown of your activity across every coding platform{% endblock %}
+{% block content %}
+<div id="platform-content">
+  <div class="card" style="text-align:center;padding:40px;color:var(--muted)">Loading platform data...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const PLAT_COLORS={'LeetCode':'#f59e0b','HackerRank':'#10b981','Codeforces':'#6366f1','CodeChef':'#8b5cf6','GeeksForGeeks':'#06b6d4','InterviewBit':'#ec4899','AtCoder':'#f97316','SPOJ':'#14b8a6','Other':'#7b8199'};
+const PLAT_ICONS={'LeetCode':'🟡','HackerRank':'🟢','Codeforces':'🔵','CodeChef':'🟤','GeeksForGeeks':'🌿','InterviewBit':'🎯','AtCoder':'🔴','SPOJ':'🔷','Other':'⚪'};
+const LANG_COLORS={'Python':'#3b82f6','Java':'#f97316','C++':'#8b5cf6','C':'#6b7280','JavaScript':'#eab308','TypeScript':'#2563eb','Go':'#06b6d4','Rust':'#ef4444','Kotlin':'#a855f7','Swift':'#f97316','C#':'#10b981','Ruby':'#dc2626','Other':'#7b8199'};
+
+async function load(){
+  const data=await fetch('/api/analytics').then(r=>r.json());
+  const el=document.getElementById('platform-content');
+  if(data.empty){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted)">No data yet. Log some problems first!</div>';return;}
+  const platforms=data.platform_stats;
+  const langMap=data.lang_map;
+
+  // Summary metrics
+  const summaryHtml=`<div class="metrics-grid" style="grid-template-columns:repeat(${Math.min(platforms.length+1,5)},1fr);margin-bottom:22px">
+    <div class="metric"><div class="metric-label">Platforms</div><div class="metric-val">${platforms.length}</div><div class="metric-sub">active</div></div>
+    ${platforms.slice(0,4).map(p=>`<div class="metric" style="border-left:3px solid ${PLAT_COLORS[p.platform]||'#7b8199'}">
+      <div class="metric-label">${PLAT_ICONS[p.platform]||'⚪'} ${p.platform}</div>
+      <div class="metric-val" style="color:${PLAT_COLORS[p.platform]||'#7b8199'}">${p.total}</div>
+      <div class="metric-sub">${p.solved} solved</div>
+    </div>`).join('')}
+  </div>`;
+
+  // Platform cards
+  const platformCards=platforms.map(p=>{
+    const pct=p.total?Math.round(p.solved/p.total*100):0;
+    const color=PLAT_COLORS[p.platform]||'#7b8199';
+    const topLangs=Object.entries(p.languages).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const diffTotal=p.Easy+p.Medium+p.Hard||1;
+    return `<div class="card" style="border-left:4px solid ${color}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:24px">${PLAT_ICONS[p.platform]||'⚪'}</span>
+          <div>
+            <div style="font-size:16px;font-weight:700">${p.platform}</div>
+            <div style="font-size:12px;color:var(--muted)">${p.total} problems • ${p.solved} solved</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:28px;font-weight:800;color:${color}">${pct}%</div>
+          <div style="font-size:11px;color:var(--muted)">solve rate</div>
+        </div>
+      </div>
+
+      <div class="prog-bar" style="height:8px;margin-bottom:16px">
+        <div class="prog-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:10px">Difficulty</div>
+          ${['Easy','Medium','Hard'].map((d,i)=>{
+            const dc=['#10b981','#f59e0b','#ef4444'][i];
+            const pct2=p.total?Math.round(p[d]/diffTotal*100):0;
+            return `<div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                <span style="color:${dc};font-weight:600">${d}</span>
+                <span style="color:var(--muted)">${p[d]} (${pct2}%)</span>
+              </div>
+              <div class="prog-bar"><div class="prog-fill" style="width:${pct2}%;background:${dc}"></div></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:10px">Languages Used</div>
+          ${topLangs.map(([lang,cnt])=>`
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div style="width:8px;height:8px;border-radius:50%;background:${LANG_COLORS[lang]||'#7b8199'};flex-shrink:0"></div>
+              <span style="font-size:12px;flex:1">${lang}</span>
+              <span style="font-size:12px;color:var(--muted);font-weight:600">${cnt}</span>
+            </div>`).join('')}
+          ${topLangs.length===0?'<span style="font-size:12px;color:var(--muted)">None logged</span>':''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Language distribution
+  const totalLang=Object.values(langMap).reduce((a,b)=>a+b,0)||1;
+  const sortedLangs=Object.entries(langMap).sort((a,b)=>b[1]-a[1]);
+  const langSection=`<div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">💻 Language Distribution</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:18px">Across all platforms</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        ${sortedLangs.map(([lang,cnt])=>{
+          const pct=Math.round(cnt/totalLang*100);
+          return `<div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+              <div style="display:flex;align-items:center;gap:7px">
+                <div style="width:9px;height:9px;border-radius:50%;background:${LANG_COLORS[lang]||'#7b8199'}"></div>
+                <span style="font-weight:600">${lang}</span>
+              </div>
+              <span style="color:var(--muted)">${cnt} (${pct}%)</span>
+            </div>
+            <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${LANG_COLORS[lang]||'#7b8199'}"></div></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center">
+        <canvas id="lang-donut" width="180" height="180"></canvas>
+      </div>
+    </div>
+  </div>`;
+
+  el.innerHTML=summaryHtml+`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px;margin-bottom:20px">${platformCards}</div>`+langSection;
+
+  // Draw donut
+  const canvas=document.getElementById('lang-donut');
+  if(canvas&&sortedLangs.length){
+    const ctx=canvas.getContext('2d');
+    const cx=90,cy=90,r=74,inner=44;
+    let start=-Math.PI/2;
+    sortedLangs.forEach(([lang,cnt])=>{
+      const slice=(cnt/totalLang)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,start,start+slice);ctx.closePath();
+      ctx.fillStyle=LANG_COLORS[lang]||'#7b8199';ctx.fill();
+      start+=slice;
+    });
+    ctx.beginPath();ctx.arc(cx,cy,inner,0,Math.PI*2);ctx.fillStyle='#12151f';ctx.fill();
+    ctx.fillStyle='#e8eaf6';ctx.font='bold 18px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(sortedLangs.length,cx,cy-7);
+    ctx.fillStyle='#7b8199';ctx.font='11px Segoe UI';ctx.fillText('languages',cx,cy+10);
+  }
+}
+load();
+</script>
+{% endblock %}

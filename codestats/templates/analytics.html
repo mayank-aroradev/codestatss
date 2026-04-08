@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Analytics — CodeStats{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+{% block page_sub %}Deep dive into your performance patterns and trends{% endblock %}
+{% block content %}
+<div class="metrics-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="metric"><div class="metric-label">📊 Total</div><div class="metric-val" id="a-total">—</div></div>
+  <div class="metric"><div class="metric-label">✅ Solved</div><div class="metric-val" id="a-solved" style="color:var(--green)">—</div></div>
+  <div class="metric"><div class="metric-label">❌ Unsolved</div><div class="metric-val" id="a-unsolved" style="color:var(--danger)">—</div></div>
+  <div class="metric"><div class="metric-label">⏱ Total Time</div><div class="metric-val" id="a-time">—</div><div class="metric-sub">mins</div></div>
+  <div class="metric"><div class="metric-label">🔥 Streak</div><div class="metric-val" id="a-streak" style="color:var(--warn)">—</div><div class="metric-sub">days</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:20px">
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">Last 7 Days</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Daily problem count</div>
+    <div id="week-chart" style="display:flex;align-items:flex-end;gap:6px;height:110px"></div>
+    <div id="week-labels" style="display:flex;gap:6px;margin-top:5px"></div>
+  </div>
+  <div class="card" id="time-trend-card" style="display:none">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">⏱ Avg Solve Time</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Weekly avg (mins) — getting faster?</div>
+    <div id="time-trend-chart" style="display:flex;align-items:flex-end;gap:6px;height:110px"></div>
+    <div id="time-trend-labels" style="display:flex;gap:6px;margin-top:5px"></div>
+  </div>
+  <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px;align-self:flex-start">Solve Rate</div>
+    <canvas id="ring" width="150" height="150"></canvas>
+    <div style="font-size:12px;color:var(--muted);margin-top:10px" id="ring-label"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div>
+      <div style="font-size:14px;font-weight:700">Topic Breakdown</div>
+      <div style="font-size:12px;color:var(--muted)">Grouped by topic with weakness score</div>
+    </div>
+    <select id="sort-sel" onchange="renderTopics()" style="padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:12px">
+      <option value="weakness">By Weakness ↓</option>
+      <option value="total">By Total ↓</option>
+      <option value="solved">By Solved ↓</option>
+      <option value="time">By Avg Time ↓</option>
+    </select>
+  </div>
+  <div id="topic-table"></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:14px">Difficulty Distribution</div>
+    <div id="diff-bars"></div>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:4px">⚠ Weakness Radar</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Heap-ranked by weakness score</div>
+    <div id="weak-radar"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let topicStats=[];
+async function load(){
+  const d=await fetch('/api/analytics').then(r=>r.json());
+  if(d.empty){document.querySelectorAll('.metric-val').forEach(e=>e.textContent='0');return;}
+  document.getElementById('a-total').textContent=d.total;
+  document.getElementById('a-solved').textContent=d.solved;
+  document.getElementById('a-unsolved').textContent=d.unsolved;
+  document.getElementById('a-time').textContent=d.total_time;
+  document.getElementById('a-streak').textContent=d.streak;
+  topicStats=d.topic_stats;
+  renderWeek(d.recent);renderRing(d.solved,d.total);renderTopics();renderDiff(d.diff_map,d.total);renderRadar(d.weak_topics);
+  if(d.time_trend&&d.time_trend.length>1){document.getElementById('time-trend-card').style.display='block';renderTimeTrend(d.time_trend);}
+
+}
+function renderTimeTrend(trend){
+  const max=Math.max(...trend.map(r=>r.avg),1);
+  const c=document.getElementById('time-trend-chart'),l=document.getElementById('time-trend-labels');
+  c.innerHTML='';l.innerHTML='';
+  trend.forEach(d=>{
+    const pct=(d.avg/max)*100;
+    const bar=document.createElement('div');
+    bar.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;gap:3px';
+    bar.innerHTML=`<div style="font-size:10px;color:var(--muted)">${d.avg}</div>
+      <div style="width:100%;background:var(--surface2);border-radius:3px 3px 0 0;overflow:hidden;flex:1;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${pct}%;background:linear-gradient(0deg,var(--accent2),rgba(6,182,212,.4));border-radius:3px 3px 0 0"></div>
+      </div>`;
+    c.appendChild(bar);
+    const lbl=document.createElement('div');
+    lbl.style.cssText='flex:1;text-align:center;font-size:10px;color:var(--muted)';
+    lbl.textContent=d.week;
+    l.appendChild(lbl);
+  });
+}
+function renderWeek(recent){
+  const max=Math.max(...recent.map(r=>r.count),1);
+  const days=['S','M','T','W','T','F','S'];
+  const c=document.getElementById('week-chart'),l=document.getElementById('week-labels');
+  c.innerHTML='';l.innerHTML='';
+  recent.forEach(d=>{
+    const pct=(d.count/max)*100;
+    const bar=document.createElement('div');
+    bar.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;gap:3px';
+    bar.innerHTML=`<div style="font-size:10px;color:var(--muted)">${d.count||''}</div>
+      <div style="width:100%;background:var(--surface2);border-radius:3px 3px 0 0;overflow:hidden;flex:1;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${pct}%;background:${d.count?'linear-gradient(180deg,var(--accent),rgba(6,182,212,.7))':'transparent'};border-radius:3px 3px 0 0;min-height:${d.count?'3px':'0'}"></div>
+      </div>`;
+    c.appendChild(bar);
+    const lbl=document.createElement('div');
+    lbl.style.cssText='flex:1;text-align:center;font-size:10px;color:var(--muted)';
+    lbl.textContent=days[new Date(d.date+'T00:00:00').getDay()];
+    l.appendChild(lbl);
+  });
+}
+function renderRing(solved,total){
+  const canvas=document.getElementById('ring');const ctx=canvas.getContext('2d');
+  const pct=total?solved/total:0;const cx=75,cy=75,r=60,lw=16;
+  ctx.clearRect(0,0,150,150);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='#1a1d2e';ctx.lineWidth=lw;ctx.stroke();
+  if(pct>0){ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);ctx.strokeStyle='#6366f1';ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();}
+  ctx.fillStyle='#e8eaf6';ctx.font='bold 20px Segoe UI';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(Math.round(pct*100)+'%',cx,cy-7);
+  ctx.fillStyle='#7b8199';ctx.font='11px Segoe UI';ctx.fillText('solved',cx,cy+10);
+  document.getElementById('ring-label').textContent=`${solved} of ${total} problems solved`;
+}
+function renderTopics(){
+  const by=document.getElementById('sort-sel').value;
+  const sorted=[...topicStats].sort((a,b)=>by==='weakness'?b.weakness-a.weakness:by==='total'?b.total-a.total:by==='solved'?b.solved-a.solved:b.avg_time-a.avg_time);
+  const el=document.getElementById('topic-table');
+  if(!sorted.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">No data</div>';return;}
+  el.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+      <th style="text-align:left;padding:7px 0;font-weight:500">Topic</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:center">Total</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:center">Solved</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:center">Avg Time</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:left;min-width:120px">Progress</th>
+      <th style="padding:7px 8px;font-weight:500;text-align:center">Weakness</th>
+    </tr></thead>
+    <tbody>${sorted.map(t=>`<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background='transparent'">
+      <td style="padding:10px 0;font-weight:600">${t.topic}</td>
+      <td style="padding:10px 8px;text-align:center;color:var(--muted)">${t.total}</td>
+      <td style="padding:10px 8px;text-align:center;color:var(--green)">${t.solved}</td>
+      <td style="padding:10px 8px;text-align:center;color:var(--muted)">${t.avg_time}m</td>
+      <td style="padding:10px 8px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${t.pct}%;background:${t.pct===100?'#10b981':t.pct>60?'#f59e0b':'#ef4444'}"></div></div>
+          <span style="font-size:11px;color:var(--muted);min-width:26px">${t.pct}%</span>
+        </div>
+      </td>
+      <td style="padding:10px 8px;text-align:center"><span style="font-size:12px;font-weight:700;color:${t.weakness>1?'#ef4444':t.weakness>0.5?'#f59e0b':'#10b981'}">${t.weakness}</span></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+function renderDiff(dm,total){
+  const diffs=[{l:'Easy',v:dm.Easy||0,c:'#10b981'},{l:'Medium',v:dm.Medium||0,c:'#f59e0b'},{l:'Hard',v:dm.Hard||0,c:'#ef4444'}];
+  document.getElementById('diff-bars').innerHTML=diffs.map(d=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:600;color:${d.c}">${d.l}</span>
+        <span style="font-size:12px;color:var(--muted)">${d.v} (${total?Math.round(d.v/total*100):0}%)</span>
+      </div>
+      <div class="prog-bar" style="height:9px"><div class="prog-fill" style="width:${total?Math.round(d.v/total*100):0}%;background:${d.c}"></div></div>
+    </div>`).join('');
+}
+function renderRadar(topics){
+  const el=document.getElementById('weak-radar');
+  if(!topics.length){el.innerHTML='<div style="color:var(--muted);font-size:13px">Log more problems across topics</div>';return;}
+  const max=Math.max(...topics.map(t=>t.weakness),.01);
+  el.innerHTML=topics.map((t,i)=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:13px;font-weight:600">${['🔴','🟡','🟢'][i]||'•'} ${t.topic}</span>
+        <span style="font-size:11px;color:var(--muted)">score: ${t.weakness}</span>
+      </div>
+      <div class="prog-bar" style="height:7px"><div class="prog-fill" style="width:${Math.round(t.weakness/max*100)}%;background:linear-gradient(90deg,#ef4444,#f59e0b)"></div></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">${t.solved}/${t.total} solved · ${t.avg_time}m avg</div>
+    </div>`).join('');
+}
+load();
+</script>
+{% endblock %}

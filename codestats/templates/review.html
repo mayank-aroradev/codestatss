@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Review Queue — CodeStats{% endblock %}
+{% block page_title %}Review Queue{% endblock %}
+{% block page_sub %}Spaced repetition — practice problems due for review today{% endblock %}
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+
+<!-- Main review area -->
+<div>
+  <div id="review-loading" class="card" style="text-align:center;padding:40px;color:var(--muted)">Loading review queue...</div>
+
+  <div id="review-empty" class="card" style="display:none;text-align:center;padding:52px 28px">
+    <div style="font-size:44px;margin-bottom:14px">🎉</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">All caught up!</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">No problems due for review today. Come back tomorrow!</div>
+    <a href="/tracker" class="btn btn-primary">Log a New Problem</a>
+  </div>
+
+  <div id="review-card" style="display:none">
+    <!-- Progress bar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="font-size:12px;color:var(--muted)" id="rev-progress">0 / 0</div>
+      <div class="prog-bar" style="flex:1;height:6px">
+        <div class="prog-fill" id="rev-prog-fill" style="width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span id="rev-name" style="font-size:17px;font-weight:700"></span>
+            <span id="rev-diff" class="badge"></span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:11px;color:var(--muted)">
+            <span id="rev-topic"></span>
+            <span id="rev-platform"></span>
+            <span id="rev-lang"></span>
+            <span id="rev-time"></span>
+          </div>
+        </div>
+        <a id="rev-link" href="#" target="_blank" style="display:none" class="btn btn-ghost btn-sm">Open ↗</a>
+      </div>
+
+      <!-- Hidden answer section -->
+      <div id="rev-answer" style="display:none">
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+          <div id="rev-notes" style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:12px"></div>
+          <div id="rev-code-wrap" style="display:none">
+            <div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Your Solution</div>
+            <pre id="rev-code" style="background:var(--bg);padding:14px;border-radius:9px;font-size:11px;font-family:'Consolas',monospace;overflow-x:auto;white-space:pre-wrap;color:var(--text);line-height:1.5;max-height:300px;overflow-y:auto;border:1px solid var(--border)"></pre>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <!-- Show answer button -->
+        <button id="btn-show" class="btn btn-ghost" style="width:100%;padding:10px;font-size:13px" onclick="showAnswer()">
+          👁 Show Notes & Solution
+        </button>
+
+        <!-- Verdict buttons (hidden until answer shown) -->
+        <div id="verdict-btns" style="display:none;display:none;gap:9px">
+          <button class="btn" style="flex:1;padding:10px;font-size:13px;background:rgba(239,68,68,.08);color:var(--danger);border:1px solid rgba(239,68,68,.2)" onclick="submitVerdict(false)">
+            😬 Forgot — retry in 1 day
+          </button>
+          <button class="btn btn-primary" style="flex:1;padding:10px;font-size:13px" onclick="submitVerdict(true)">
+            ✓ Got it! Next review →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar: stats -->
+<div>
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px">📊 Review Stats</div>
+    <div style="display:flex;flex-direction:column;gap:10px" id="rev-stats">
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--muted)">Due today</span>
+        <span id="stat-due" style="font-weight:700">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--muted)">Reviewed</span>
+        <span id="stat-reviewed" style="font-weight:700;color:var(--green)">0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--muted)">Remembered</span>
+        <span id="stat-remembered" style="font-weight:700;color:var(--accent)">0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--muted)">Forgot</span>
+        <span id="stat-forgot" style="font-weight:700;color:var(--danger)">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="background:rgba(99,102,241,.04);border-color:rgba(99,102,241,.2)">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">How it works</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.7">
+      Problems you've solved are queued for review using spaced repetition:
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+        <span>✓ Remembered → 1→3→7→14→30→60 days</span>
+        <span>✕ Forgot → reset to 1 day</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let queue = [], current = 0, reviewed = 0, remembered = 0, forgot = 0;
+
+async function loadQueue() {
+  const due = await fetch('/api/review-due').then(r => r.json());
+  document.getElementById('review-loading').style.display = 'none';
+  queue = due;
+  document.getElementById('stat-due').textContent = queue.length;
+
+  if (!queue.length) {
+    document.getElementById('review-empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('review-card').style.display = 'block';
+  showCard();
+}
+
+function showCard() {
+  if (current >= queue.length) {
+    document.getElementById('review-card').style.display = 'none';
+    document.getElementById('review-empty').style.display = 'block';
+    document.querySelector('#review-empty div:nth-child(2)').textContent = '🎊 Session complete!';
+    document.querySelector('#review-empty div:nth-child(3)').textContent = `You reviewed ${reviewed} problems. Well done!`;
+    return;
+  }
+
+  const p = queue[current];
+  document.getElementById('rev-progress').textContent = `${current + 1} / ${queue.length}`;
+  document.getElementById('rev-prog-fill').style.width = ((current / queue.length) * 100) + '%';
+
+  document.getElementById('rev-name').textContent = p.question_name;
+  const diffEl = document.getElementById('rev-diff');
+  diffEl.textContent = p.difficulty;
+  diffEl.className = 'badge b-' + p.difficulty.toLowerCase();
+
+  document.getElementById('rev-topic').textContent = '📂 ' + p.topic;
+  document.getElementById('rev-platform').textContent = p.platform || '';
+  document.getElementById('rev-lang').textContent = '💻 ' + (p.language || '');
+  document.getElementById('rev-time').textContent = '⏱ ' + p.time_minutes + 'm';
+
+  const linkEl = document.getElementById('rev-link');
+  if (p.question_link) { linkEl.href = p.question_link; linkEl.style.display = 'inline-flex'; }
+  else linkEl.style.display = 'none';
+
+  // Notes
+  const notesEl = document.getElementById('rev-notes');
+  notesEl.textContent = p.notes || '(No notes saved for this problem)';
+  notesEl.style.color = p.notes ? 'var(--text)' : 'var(--muted)';
+
+  // Code
+  const codeWrap = document.getElementById('rev-code-wrap');
+  if (p.solution_code) {
+    document.getElementById('rev-code').textContent = p.solution_code;
+    codeWrap.style.display = 'block';
+  } else codeWrap.style.display = 'none';
+
+  // Reset buttons
+  document.getElementById('rev-answer').style.display = 'none';
+  document.getElementById('btn-show').style.display = 'block';
+  document.getElementById('verdict-btns').style.display = 'none';
+}
+
+function showAnswer() {
+  document.getElementById('rev-answer').style.display = 'block';
+  document.getElementById('btn-show').style.display = 'none';
+  const vb = document.getElementById('verdict-btns');
+  vb.style.display = 'flex';
+}
+
+async function submitVerdict(rem) {
+  const p = queue[current];
+  await fetch(`/api/problems/${p.id}/review`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ remembered: rem })
+  });
+  reviewed++;
+  if (rem) remembered++; else forgot++;
+  document.getElementById('stat-reviewed').textContent = reviewed;
+  document.getElementById('stat-remembered').textContent = remembered;
+  document.getElementById('stat-forgot').textContent = forgot;
+  current++;
+  showCard();
+}
+
+loadQueue();
+</script>
+{% endblock %}
