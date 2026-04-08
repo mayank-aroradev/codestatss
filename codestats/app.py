@@ -8,7 +8,7 @@ import json, os, re, urllib.request, urllib.parse, secrets, csv, io
 app = Flask(__name__)
 
 # ── Security ──────────────────────────────────────────────────────────────────
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = 'mysupersecretkey123'
 if not SECRET_KEY:
     if os.environ.get('FLASK_ENV') == 'production':
         raise RuntimeError("SECRET_KEY environment variable must be set in production!")
